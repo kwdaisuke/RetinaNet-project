@@ -1,6 +1,6 @@
 # RetinaNet-project
 
-Keras implenmentation of RetinaNet. \
+Keras implementation of RetinaNet. \
 ![alt text](https://github.com/kwdaisuke/RetinaNet-project/blob/main/data/grand.png?raw=true)
 
 # Todo
