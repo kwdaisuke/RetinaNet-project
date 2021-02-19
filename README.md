@@ -4,6 +4,7 @@ Keras implenmentation of RetinaNet. \
 ![alt text](https://github.com/kwdaisuke/RetinaNet-project/blob/main/data/grand.png?raw=true)
 
 # Todo
+- Check benchmarks
 - Try with different layers
 - Normalization free model
 
