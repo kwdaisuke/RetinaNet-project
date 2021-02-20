@@ -2,7 +2,6 @@ import os
 import re
 import zipfile
 
-
 from preprocess import preprocess_data
 from labelencoder import AnchorBox, LabelEncoder
 from loss import RetinaNetLoss
@@ -228,63 +227,36 @@ model = RetinaNet(num_classes, resnet50_backbone)
 optimizer = tf.optimizers.SGD(learning_rate=learning_rate_fn, momentum=0.9)
 model.compile(loss=loss_fn, optimizer=optimizer)
 
-callbacks_list = [
-    tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(model_dir, "weights" + "_epoch_{epoch}"),
-        monitor="loss",
-        save_best_only=False,
-        save_weights_only=True,
-        verbose=1,
-    )
-]
-
 #  set `data_dir=None` to load the complete dataset
 (train_dataset, val_dataset), dataset_info = tfds.load(
     "coco/2017", split=["train", "validation"], with_info=True, data_dir="data"
 )
-
-
-autotune = tf.data.experimental.AUTOTUNE
 preprocess = preprocess_data()
-train_dataset = train_dataset.map(preprocess.preprocess, num_parallel_calls=autotune)
-train_dataset = train_dataset.shuffle(8 * batch_size)
-train_dataset = train_dataset.padded_batch(
-    batch_size=batch_size, padding_values=(0.0, 1e-8, -1), drop_remainder=True
-)
-train_dataset = train_dataset.map(
-    label_encoder.encode_batch, num_parallel_calls=autotune
-)
-train_dataset = train_dataset.apply(tf.data.experimental.ignore_errors())
-train_dataset = train_dataset.prefetch(autotune)
 
-val_dataset = val_dataset.map(preprocess.preprocess, num_parallel_calls=autotune)
-val_dataset = val_dataset.padded_batch(
-    batch_size=1, padding_values=(0.0, 1e-8, -1), drop_remainder=True
-)
-val_dataset = val_dataset.map(label_encoder.encode_batch, num_parallel_calls=autotune)
-val_dataset = val_dataset.apply(tf.data.experimental.ignore_errors())
-val_dataset = val_dataset.prefetch(autotune)
+def process(train_dataset, val_dataset):
+    autotune = tf.data.experimental.AUTOTUNE  
+    train_dataset = train_dataset.map(preprocess.preprocess, num_parallel_calls=autotune)
+    train_dataset = train_dataset.shuffle(8 * batch_size)
+    train_dataset = train_dataset.padded_batch(batch_size=batch_size, padding_values=(0.0, 1e-8, -1), drop_remainder=True)
+    train_dataset = train_dataset.map(label_encoder.encode_batch, num_parallel_calls=autotune)
+    train_dataset = train_dataset.apply(tf.data.experimental.ignore_errors())
+    train_dataset = train_dataset.prefetch(autotune)
 
+    val_dataset = val_dataset.map(preprocess.preprocess, num_parallel_calls=autotune)
+    val_dataset = val_dataset.padded_batch(batch_size=1, padding_values=(0.0, 1e-8, -1), drop_remainder=True)
+    val_dataset = val_dataset.map(label_encoder.encode_batch, num_parallel_calls=autotune)
+    val_dataset = val_dataset.apply(tf.data.experimental.ignore_errors())
+    val_dataset = val_dataset.prefetch(autotune)
+    return train_dataset, val_dataset
 
-
-# Uncomment the following lines, when training on full dataset
-# train_steps_per_epoch = dataset_info.splits["train"].num_examples // batch_size
-# val_steps_per_epoch = \
-#     dataset_info.splits["validation"].num_examples // batch_size
-
-# train_steps = 4 * 100000
-# epochs = train_steps // train_steps_per_epoch
+train_dataset, val_dataset = process(train_dataset, val_dataset)
 
 epochs = 1
-
-# Running 100 training and 50 validation steps,
-# remove `.take` when training on the full dataset
 
 model.fit(
     train_dataset.take(1),
     validation_data=val_dataset.take(1),
     epochs=epochs,
-    callbacks=callbacks_list,
     verbose=1,
 )
 
@@ -308,7 +280,7 @@ def prepare_image(image):
 
 val_dataset = tfds.load("coco/2017", split="validation", data_dir="data")
 int2str = dataset_info.features["objects"]["label"].int2str
-for sample in val_dataset.take(50):
+for sample in val_dataset.take(10):
     image = tf.cast(sample["image"], dtype=tf.float32)
     input_image, ratio = prepare_image(image)
     detections = inference_model.predict(input_image)
@@ -323,8 +295,11 @@ for sample in val_dataset.take(50):
         detections.nmsed_scores[0][:num_detections],
     )
     
+link = "https://images.unsplash.com/photo-1601247309106-7f9f6d85c8be?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80" #Skateboard
+    
 def select_from_web(link):
     from PIL import Image
+    import requests
     im = Image.open(requests.get(link, stream=True).raw)
     array = tf.keras.preprocessing.image.img_to_array(im)
     input_image, ratio = prepare_image(array)
@@ -338,5 +313,7 @@ def select_from_web(link):
         detections.nmsed_boxes[0][:num_detections] / ratio,
         class_names,
         detections.nmsed_scores[0][:num_detections],
+        
     )
-    cccccccccccccccc
+    dic = dict(zip(class_names, detections.nmsed_scores[0][:num_detections])) 
+    print(dic)

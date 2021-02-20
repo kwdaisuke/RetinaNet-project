@@ -1,5 +1,7 @@
 
 import tensorflow as tf
+from labelencoder import LabelEncoder
+
 
 class preprocess_data:
     """Applies preprocessing step to a single sample
@@ -14,7 +16,23 @@ class preprocess_data:
     """
     def __init__(self):
         pass
-        
+
+    def process(self, train_dataset, val_dataset):
+        autotune = tf.data.experimental.AUTOTUNE  
+        train_dataset = train_dataset.map(self.preprocess, num_parallel_calls=autotune)
+        train_dataset = train_dataset.shuffle(8 * batch_size)
+        train_dataset = train_dataset.padded_batch(batch_size=batch_size, padding_values=(0.0, 1e-8, -1), drop_remainder=True)
+        train_dataset = train_dataset.map(label_encoder.encode_batch, num_parallel_calls=autotune)
+        train_dataset = train_dataset.apply(tf.data.experimental.ignore_errors())
+        train_dataset = train_dataset.prefetch(autotune)
+
+        val_dataset = val_dataset.map(self.preprocess, num_parallel_calls=autotune)
+        val_dataset = val_dataset.padded_batch(batch_size=1, padding_values=(0.0, 1e-8, -1), drop_remainder=True)
+        val_dataset = val_dataset.map(LabelEncoder.encode_batch, num_parallel_calls=autotune)
+        val_dataset = val_dataset.apply(tf.data.experimental.ignore_errors())
+        val_dataset = val_dataset.prefetch(autotune)
+        return train_dataset, val_dataset    
+    
     def preprocess(self, sample):
         image = sample["image"]
         bbox = self.swap_xy(sample["objects"]["bbox"])
@@ -147,4 +165,4 @@ class preprocess_data:
             image, 0, 0, padded_image_shape[0], padded_image_shape[1]
         )
         return image, image_shape, ratio
-
+    
