@@ -315,5 +315,5 @@ def select_from_web(link):
         detections.nmsed_scores[0][:num_detections],
         
     )
-    dic = dict(zip(class_names, detections.nmsed_scores[0][:num_detections])) 
-    print(dic)
+    predict = dict(zip(class_names, detections.nmsed_scores[0][:num_detections])) 
+    print(predict)
