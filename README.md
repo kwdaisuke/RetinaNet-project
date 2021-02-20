@@ -3,6 +3,9 @@
 Keras implenmentation of RetinaNet. \
 ![alt text](https://github.com/kwdaisuke/RetinaNet-project/blob/main/data/grand.png?raw=true)
 
+with prediction scores
+![](https://github.com/kwdaisuke/RetinaNet-project/blob/main/data/Screenshot%20(102).png?raw=true)
+
 # Todo
 - Try different benchmarks
 - Try with different layers
