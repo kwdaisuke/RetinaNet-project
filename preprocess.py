@@ -1,6 +1,25 @@
 
 import tensorflow as tf
+import labelencoder
 from labelencoder import LabelEncoder
+
+import tensorflow_datasets as tfds
+(train_dataset, val_dataset), dataset_info = tfds.load(
+    "coco/2017", split=["train", "validation"], with_info=True, data_dir="data"
+)
+
+
+
+from labelencoder import AnchorBox, LabelEncoder
+from loss import RetinaNetLoss
+
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+
+import matplotlib.pyplot as plt
+import tensorflow_datasets as tfds
+
 
 
 class preprocess_data:
@@ -14,21 +33,22 @@ class preprocess_data:
       class_id: An tensor representing the class id of the objects, having
         shape `(num_objects,)`.
     """
-    def __init__(self):
-        pass
+    def __init__(self, batch_size=2):
+        self.batch_size = batch_size
 
     def process(self, train_dataset, val_dataset):
+        label_encoder = LabelEncoder()
         autotune = tf.data.experimental.AUTOTUNE  
         train_dataset = train_dataset.map(self.preprocess, num_parallel_calls=autotune)
-        train_dataset = train_dataset.shuffle(8 * batch_size)
-        train_dataset = train_dataset.padded_batch(batch_size=batch_size, padding_values=(0.0, 1e-8, -1), drop_remainder=True)
+        train_dataset = train_dataset.shuffle(8 * self.batch_size)
+        train_dataset = train_dataset.padded_batch(batch_size=self.batch_size, padding_values=(0.0, 1e-8, -1), drop_remainder=True)
         train_dataset = train_dataset.map(label_encoder.encode_batch, num_parallel_calls=autotune)
         train_dataset = train_dataset.apply(tf.data.experimental.ignore_errors())
         train_dataset = train_dataset.prefetch(autotune)
 
         val_dataset = val_dataset.map(self.preprocess, num_parallel_calls=autotune)
         val_dataset = val_dataset.padded_batch(batch_size=1, padding_values=(0.0, 1e-8, -1), drop_remainder=True)
-        val_dataset = val_dataset.map(LabelEncoder.encode_batch, num_parallel_calls=autotune)
+        val_dataset = val_dataset.map(label_encoder.encode_batch, num_parallel_calls=autotune)
         val_dataset = val_dataset.apply(tf.data.experimental.ignore_errors())
         val_dataset = val_dataset.prefetch(autotune)
         return train_dataset, val_dataset    
