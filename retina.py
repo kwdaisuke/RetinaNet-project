@@ -5,6 +5,8 @@ import zipfile
 from preprocess import preprocess_data
 from labelencoder import AnchorBox, LabelEncoder
 from loss import RetinaNetLoss
+from utils import select_from_web
+
 
 import numpy as np
 import tensorflow as tf
@@ -220,10 +222,10 @@ learning_rate_fn = tf.optimizers.schedules.PiecewiseConstantDecay(
     boundaries=learning_rate_boundaries, values=learning_rates
 )
 
+# Model Construction
 resnet50_backbone = get_backbone()
 loss_fn = RetinaNetLoss(num_classes)
 model = RetinaNet(num_classes, resnet50_backbone)
-
 optimizer = tf.optimizers.SGD(learning_rate=learning_rate_fn, momentum=0.9)
 model.compile(loss=loss_fn, optimizer=optimizer)
 
@@ -235,33 +237,32 @@ model.compile(loss=loss_fn, optimizer=optimizer)
 preprocess = preprocess_data()
 train_dataset, val_dataset = preprocess.process(train_dataset, val_dataset)
 
-epochs = 1
 
+# Train model
 model.fit(
     train_dataset.take(1),
     validation_data=val_dataset.take(1),
-    epochs=epochs,
+    epochs=1,
     verbose=1,
 )
-
 weights_dir = "data"
-
 latest_checkpoint = tf.train.latest_checkpoint(weights_dir)
 model.load_weights(latest_checkpoint)
 
-
+#Inference
 image = tf.keras.Input(shape=[None, None, 3], name="image")
-predictions = model(image, training=False)
-detections = DecodePredictions(confidence_threshold=0.5)(image, predictions)
-inference_model = tf.keras.Model(inputs=image, outputs=detections)
-
-
 def prepare_image(image):
     image, _, ratio = preprocess.resize_and_pad_image(image, jitter=None)
     image = tf.keras.applications.resnet.preprocess_input(image)
     return tf.expand_dims(image, axis=0), ratio
 
 
+predictions = model(image, training=False)
+detections = DecodePredictions(confidence_threshold=0.5)(image, predictions)
+inference_model = tf.keras.Model(inputs=image, outputs=detections)
+
+
+# Visualization
 val_dataset = tfds.load("coco/2017", split="validation", data_dir="data")
 int2str = dataset_info.features["objects"]["label"].int2str
 for sample in val_dataset.take(10):
@@ -279,25 +280,6 @@ for sample in val_dataset.take(10):
         detections.nmsed_scores[0][:num_detections],
     )
     
+# Inference/Visualization for the image from Website
 link = "https://images.unsplash.com/photo-1601247309106-7f9f6d85c8be?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80" #Skateboard
-    
-def select_from_web(link):
-    from PIL import Image
-    import requests
-    im = Image.open(requests.get(link, stream=True).raw)
-    array = tf.keras.preprocessing.image.img_to_array(im)
-    input_image, ratio = prepare_image(array)
-    detections = inference_model.predict(input_image)
-    num_detections = detections.valid_detections[0]
-    class_names = [
-        int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]
-    ]
-    label_encoder.visualize_detections(
-        im,
-        detections.nmsed_boxes[0][:num_detections] / ratio,
-        class_names,
-        detections.nmsed_scores[0][:num_detections],
-        
-    )
-    predict = dict(zip(class_names, detections.nmsed_scores[0][:num_detections])) 
-    print(predict)
+select_from_web(link)
