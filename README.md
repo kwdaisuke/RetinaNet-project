@@ -9,7 +9,7 @@ with prediction scores \
 # Todo
 - Try different benchmarks
 - Try with different layers
-- Normalization free model
+- Normalization free model → Poor Performance with pre-made module. 
 
 # References:
 - [Focal Loss for Dense Object Detection](https://arxiv.org/abs/1708.02002). Tsung-Yi Lin, Priya Goyal, Ross Girshick, Kaiming He, Piotr Dollár. ICCV, 2017.
