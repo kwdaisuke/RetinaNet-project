@@ -7,11 +7,9 @@ from labelencoder import AnchorBox, LabelEncoder
 from loss import RetinaNetLoss
 from utils import select_from_web
 
-
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-
 import matplotlib.pyplot as plt
 import tensorflow_datasets as tfds
 
@@ -19,12 +17,10 @@ import tensorflow_datasets as tfds
 url = "https://github.com/srihari-humbarwadi/datasets/releases/download/v0.1.0/data.zip"
 filename = os.path.join(os.getcwd(), "data.zip")
 keras.utils.get_file(filename, url)
-
-
 with zipfile.ZipFile("data.zip", "r") as z_fp:
     z_fp.extractall("./")
     
-
+# Prepare each component for the construction of the model
 def get_backbone():
     """Builds ResNet50 with pre-trained imagenet weights"""
     backbone = keras.applications.ResNet50(
@@ -207,15 +203,11 @@ class DecodePredictions(tf.keras.layers.Layer, LabelEncoder):
             self.confidence_threshold,
             clip_boxes=False,
         )
-
-
-
+    
 model_dir = "retinanet/"
 label_encoder = LabelEncoder()
-
 num_classes = 80
 batch_size = 2
-
 learning_rates = [2.5e-06, 0.000625, 0.00125, 0.0025, 0.00025, 2.5e-05]
 learning_rate_boundaries = [125, 250, 500, 240000, 360000]
 learning_rate_fn = tf.optimizers.schedules.PiecewiseConstantDecay(
@@ -236,7 +228,6 @@ model.compile(loss=loss_fn, optimizer=optimizer)
 
 preprocess = preprocess_data()
 train_dataset, val_dataset = preprocess.process(train_dataset, val_dataset)
-
 
 # Train model
 model.fit(
@@ -260,7 +251,6 @@ def prepare_image(image):
 predictions = model(image, training=False)
 detections = DecodePredictions(confidence_threshold=0.5)(image, predictions)
 inference_model = tf.keras.Model(inputs=image, outputs=detections)
-
 
 # Visualization
 val_dataset = tfds.load("coco/2017", split="validation", data_dir="data")
