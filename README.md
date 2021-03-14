@@ -9,7 +9,12 @@ with prediction scores \
 # Update
 - Add ImageLoader method
 - Add Argumentparser
+
+Make an inference of images which are in a folder typed as argument of command line
 ![](data/argparser.png)
+
+Terminal shows the result of inference with float number
+![](data/terminal.png)
 
 
 # Todo
