@@ -43,13 +43,9 @@ class Folder():
             path = os.path.join(self.path, image_n)
             if Path(path).exists(): # Check if the path exists
                 return path
-            else:
-                print("Reach the maximum length")
-                raise StopIteration
+        else:
+            print("Reach the maximum length")
+            raise StopIteration
 
     def __len__(self):
         return self.len
-
-if __name__ == "__main__":
-    dataset = Folder("images")
-

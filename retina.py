@@ -1,7 +1,9 @@
 import os
 import re
 import zipfile
+from PIL import Image
 
+from loader import Folder
 from preprocess import preprocess_data
 from labelencoder import AnchorBox, LabelEncoder
 from loss import RetinaNetLoss
@@ -13,6 +15,8 @@ import tensorflow as tf
 from tensorflow import keras
 import matplotlib.pyplot as plt
 import tensorflow_datasets as tfds
+
+
 
 
 url = "https://github.com/srihari-humbarwadi/datasets/releases/download/v0.1.0/data.zip"
@@ -211,7 +215,24 @@ def select_from_web(link):
     predict = dict(zip(class_names, detections.nmsed_scores[0][:num_detections])) 
     print(predict)
 
+def select_from_folder(dataset):
+    for sample in dataset:
+        im = Image.open(sample)
+        array = tf.keras.preprocessing.image.img_to_array(im)
+        input_image, ratio = prepare_image(array)
+        detections = inference_model.predict(input_image)
+        num_detections = detections.valid_detections[0]
+        class_names = [int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]]
+        label_encoder = LabelEncoder()
+        label_encoder.visualize_detections(
+            im,
+            detections.nmsed_boxes[0][:num_detections] / ratio,
+            class_names,
+            detections.nmsed_scores[0][:num_detections],)
+        predict = dict(zip(class_names, detections.nmsed_scores[0][:num_detections])) 
+        print(predict)
 
+    
 
 if __name__ == "__main__":
     #model_dir = "retinanet/"
@@ -280,4 +301,8 @@ if __name__ == "__main__":
 
     # Inference/Visualization for the image from Website
     link = "https://images.unsplash.com/photo-1601247309106-7f9f6d85c8be?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80" #Skateboard
-    select_from_web(link)
+    #select_from_web(link)
+    
+    data = Folder("images") # instance of Iterable folder 
+    select_from_folder(data) # Iterate over folder
+    
