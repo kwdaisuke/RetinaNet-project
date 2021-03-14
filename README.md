@@ -7,8 +7,8 @@ with prediction scores \
 ![](https://github.com/kwdaisuke/RetinaNet-project/blob/main/data/Screenshot%20(102).png?raw=true)
 
 # Update
-- Add ImageLoader method
-- Add Argumentparser
+- Add ImageLoader method 3/13
+- Add Argumentparser 3/14
 
 Make an inference of images which are in a folder typed as argument of command line
 ![](data/argparser.png)
