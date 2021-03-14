@@ -9,7 +9,7 @@ with prediction scores \
 # Update
 - Add ImageLoader method
 - Add Argumentparser
-![]()
+![](data/argparser.png)
 
 
 # Todo
