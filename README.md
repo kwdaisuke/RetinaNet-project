@@ -13,7 +13,7 @@ with prediction scores \
 Make an inference of images which are in a folder typed as argument of command line
 ![](data/argparser.png)
 
-Terminal shows the result of inference with float number
+Terminal shows the result of inference with float number \
 ![](data/terminal.png)
 
 
