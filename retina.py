@@ -16,14 +16,18 @@ from tensorflow import keras
 import matplotlib.pyplot as plt
 import tensorflow_datasets as tfds
 
+# Argument Parser
+import argparse
+parser = argparse.ArgumentParser(description="Get folder")
+parser.add_argument('-f', '--folder', type=str, help='Folder name')
+args = parser.parse_args()
 
 
-
-url = "https://github.com/srihari-humbarwadi/datasets/releases/download/v0.1.0/data.zip"
-filename = os.path.join(os.getcwd(), "data.zip")
-keras.utils.get_file(filename, url)
-with zipfile.ZipFile("data.zip", "r") as z_fp:
-    z_fp.extractall("./")
+# url = "https://github.com/srihari-humbarwadi/datasets/releases/download/v0.1.0/data.zip"
+# filename = os.path.join(os.getcwd(), "data.zip")
+# keras.utils.get_file(filename, url)
+# with zipfile.ZipFile("data.zip", "r") as z_fp:
+#     z_fp.extractall("./")
     
 # Prepare each component for the construction of the model
 def get_backbone():
@@ -92,15 +96,8 @@ def build_head(output_filters, bias_init):
             keras.layers.Conv2D(256, 3, padding="same", kernel_initializer=kernel_init))
         head.add(keras.layers.ReLU())
     head.add(
-        keras.layers.Conv2D(
-            output_filters,
-            3,
-            1,
-            padding="same",
-            kernel_initializer=kernel_init,
-            bias_initializer=bias_init,
-        )
-    )
+        keras.layers.Conv2D(output_filters, 3, 1, padding="same",
+            kernel_initializer=kernel_init, bias_initializer=bias_init,))
     return head
 
 
@@ -232,13 +229,11 @@ def select_from_folder(dataset):
         predict = dict(zip(class_names, detections.nmsed_scores[0][:num_detections])) 
         print(predict)
 
-    
 
 if __name__ == "__main__":
     #model_dir = "retinanet/"
     num_classes = 80
     batch_size = 2
-
 
     # Model Construction
     resnet50_backbone = get_backbone()
@@ -303,6 +298,7 @@ if __name__ == "__main__":
     link = "https://images.unsplash.com/photo-1601247309106-7f9f6d85c8be?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80" #Skateboard
     #select_from_web(link)
     
-    data = Folder("images") # instance of Iterable folder 
+    data = Folder(args.folder) # instance of Iterable folder 
     select_from_folder(data) # Iterate over folder
+
     
