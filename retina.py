@@ -6,6 +6,7 @@ from preprocess import preprocess_data
 from labelencoder import AnchorBox, LabelEncoder
 from loss import RetinaNetLoss
 from utils import select_from_web
+import utils
 
 import numpy as np
 import tensorflow as tf
@@ -24,15 +25,12 @@ with zipfile.ZipFile("data.zip", "r") as z_fp:
 def get_backbone():
     """Builds ResNet50 with pre-trained imagenet weights"""
     backbone = keras.applications.ResNet50(
-        include_top=False, input_shape=[None, None, 3]
-    )
+        include_top=False, input_shape=[None, None, 3])
     c3_output, c4_output, c5_output = [
         backbone.get_layer(layer_name).output
-        for layer_name in ["conv3_block4_out", "conv4_block6_out", "conv5_block3_out"]
-    ]
+        for layer_name in ["conv3_block4_out", "conv4_block6_out", "conv5_block3_out"]]
     return keras.Model(
-        inputs=[backbone.inputs], outputs=[c3_output, c4_output, c5_output]
-    )
+        inputs=[backbone.inputs], outputs=[c3_output, c4_output, c5_output])
 
 
 class FeaturePyramid(tf.keras.Model):
@@ -87,8 +85,7 @@ def build_head(output_filters, bias_init):
     kernel_init = tf.initializers.RandomNormal(0.0, 0.01)
     for _ in range(4):
         head.add(
-            keras.layers.Conv2D(256, 3, padding="same", kernel_initializer=kernel_init)
-        )
+            keras.layers.Conv2D(256, 3, padding="same", kernel_initializer=kernel_init))
         head.add(keras.layers.ReLU())
     head.add(
         keras.layers.Conv2D(
@@ -129,8 +126,7 @@ class RetinaNet(keras.Model):
         for feature in features:
             box_outputs.append(tf.reshape(self.box_head(feature), [N, -1, 4]))
             cls_outputs.append(
-                tf.reshape(self.cls_head(feature), [N, -1, self.num_classes])
-            )
+                tf.reshape(self.cls_head(feature), [N, -1, self.num_classes]))
         cls_outputs = tf.concat(cls_outputs, axis=1)
         box_outputs = tf.concat(box_outputs, axis=1)
         return tf.concat([box_outputs, cls_outputs], axis=-1)
@@ -153,16 +149,8 @@ class DecodePredictions(tf.keras.layers.Layer, LabelEncoder):
         predictions.
     """
 
-    def __init__(
-        self,
-        num_classes=80,
-        confidence_threshold=0.05,
-        nms_iou_threshold=0.5,
-        max_detections_per_class=100,
-        max_detections=100,
-        box_variance=[0.1, 0.1, 0.2, 0.2],
-        **kwargs
-    ):
+    def __init__(self,num_classes=80, confidence_threshold=0.05, nms_iou_threshold=0.5, max_detections_per_class=100,
+                 max_detections=100, box_variance=[0.1, 0.1, 0.2, 0.2], **kwargs):
         super(DecodePredictions, self).__init__(**kwargs)
         self.num_classes = num_classes
         self.confidence_threshold = confidence_threshold
@@ -172,18 +160,14 @@ class DecodePredictions(tf.keras.layers.Layer, LabelEncoder):
 
         self._anchor_box = AnchorBox()
         self._box_variance = tf.convert_to_tensor(
-            [0.1, 0.1, 0.2, 0.2], dtype=tf.float32
-        )
+            [0.1, 0.1, 0.2, 0.2], dtype=tf.float32)
 
     def _decode_box_predictions(self, anchor_boxes, box_predictions):
         boxes = box_predictions * self._box_variance
         boxes = tf.concat(
-            [
-                boxes[:, :, :2] * anchor_boxes[:, :, 2:] + anchor_boxes[:, :, :2],
-                tf.math.exp(boxes[:, :, 2:]) * anchor_boxes[:, :, 2:],
-            ],
-            axis=-1,
-        )
+            [boxes[:, :, :2] * anchor_boxes[:, :, 2:] + anchor_boxes[:, :, :2],
+            tf.math.exp(boxes[:, :, 2:]) * anchor_boxes[:, :, 2:],],
+            axis=-1,)
         boxes_transformed = self.convert_to_corners(boxes)
         return boxes_transformed
 
@@ -201,75 +185,99 @@ class DecodePredictions(tf.keras.layers.Layer, LabelEncoder):
             self.max_detections,
             self.nms_iou_threshold,
             self.confidence_threshold,
-            clip_boxes=False,
-        )
-    
-model_dir = "retinanet/"
-label_encoder = LabelEncoder()
-num_classes = 80
-batch_size = 2
-learning_rates = [2.5e-06, 0.000625, 0.00125, 0.0025, 0.00025, 2.5e-05]
-learning_rate_boundaries = [125, 250, 500, 240000, 360000]
-learning_rate_fn = tf.optimizers.schedules.PiecewiseConstantDecay(
-    boundaries=learning_rate_boundaries, values=learning_rates
-)
+            clip_boxes=False,)
 
-# Model Construction
-resnet50_backbone = get_backbone()
-loss_fn = RetinaNetLoss(num_classes)
-model = RetinaNet(num_classes, resnet50_backbone)
-optimizer = tf.optimizers.SGD(learning_rate=learning_rate_fn, momentum=0.9)
-model.compile(loss=loss_fn, optimizer=optimizer)
 
-#  set `data_dir=None` to load the complete dataset
-(train_dataset, val_dataset), dataset_info = tfds.load(
-    "coco/2017", split=["train", "validation"], with_info=True, data_dir="data"
-)
-
-preprocess = preprocess_data()
-train_dataset, val_dataset = preprocess.process(train_dataset, val_dataset)
-
-# Train model
-model.fit(
-    train_dataset.take(1),
-    validation_data=val_dataset.take(1),
-    epochs=1,
-    verbose=1,
-)
-weights_dir = "data"
-latest_checkpoint = tf.train.latest_checkpoint(weights_dir)
-model.load_weights(latest_checkpoint)
-
-#Inference
-image = tf.keras.Input(shape=[None, None, 3], name="image")
 def prepare_image(image):
     image, _, ratio = preprocess.resize_and_pad_image(image, jitter=None)
     image = tf.keras.applications.resnet.preprocess_input(image)
     return tf.expand_dims(image, axis=0), ratio
-
-
-predictions = model(image, training=False)
-detections = DecodePredictions(confidence_threshold=0.5)(image, predictions)
-inference_model = tf.keras.Model(inputs=image, outputs=detections)
-
-# Visualization
-val_dataset = tfds.load("coco/2017", split="validation", data_dir="data")
-int2str = dataset_info.features["objects"]["label"].int2str
-for sample in val_dataset.take(10):
-    image = tf.cast(sample["image"], dtype=tf.float32)
-    input_image, ratio = prepare_image(image)
+    
+def select_from_web(link):
+    from PIL import Image
+    import requests
+    im = Image.open(requests.get(link, stream=True).raw)
+    array = tf.keras.preprocessing.image.img_to_array(im)
+    input_image, ratio = prepare_image(array)
     detections = inference_model.predict(input_image)
     num_detections = detections.valid_detections[0]
-    class_names = [
-        int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]
-    ]
+    class_names = [int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]]
+    label_encoder = LabelEncoder()
     label_encoder.visualize_detections(
-        image,
+        im,
         detections.nmsed_boxes[0][:num_detections] / ratio,
         class_names,
-        detections.nmsed_scores[0][:num_detections],
-    )
+        detections.nmsed_scores[0][:num_detections],)
+    predict = dict(zip(class_names, detections.nmsed_scores[0][:num_detections])) 
+    print(predict)
+
+
+
+if __name__ == "__main__":
+    #model_dir = "retinanet/"
+    num_classes = 80
+    batch_size = 2
+
+
+    # Model Construction
+    resnet50_backbone = get_backbone()
+    model = RetinaNet(num_classes, resnet50_backbone)
+    loss_fn = RetinaNetLoss(num_classes)
+    learning_rates = [2.5e-06, 0.000625, 0.00125, 0.0025, 0.00025, 2.5e-05]
+    learning_rate_boundaries = [125, 250, 500, 240000, 360000]
+    learning_rate_fn = tf.optimizers.schedules.PiecewiseConstantDecay(
+        boundaries=learning_rate_boundaries, values=learning_rates)
+    optimizer = tf.optimizers.SGD(learning_rate=learning_rate_fn, momentum=0.9)
+    model.compile(loss=loss_fn, optimizer=optimizer)
     
-# Inference/Visualization for the image from Website
-link = "https://images.unsplash.com/photo-1601247309106-7f9f6d85c8be?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80" #Skateboard
-select_from_web(link)
+    # Import dataset
+    #  set `data_dir=None` to load the complete dataset
+    (train_dataset, val_dataset), dataset_info = tfds.load(
+        "coco/2017", split=["train", "validation"], with_info=True, data_dir="data")
+    
+    # Preprocess data
+    preprocess = preprocess_data()
+    train_dataset, val_dataset = preprocess.process(train_dataset, val_dataset)
+
+    # Train model
+    model.fit(
+        train_dataset.take(1),
+        validation_data=val_dataset.take(1),
+        epochs=1,
+        verbose=1,)
+    weights_dir = "data"
+    latest_checkpoint = tf.train.latest_checkpoint(weights_dir)
+    model.load_weights(latest_checkpoint)
+
+    #Inference
+    image = tf.keras.Input(shape=[None, None, 3], name="image")
+    predictions = model(image, training=False)
+    detections = DecodePredictions(confidence_threshold=0.5)(image, predictions)
+    inference_model = tf.keras.Model(inputs=image, outputs=detections)
+
+    # # Visualization
+    # val_dataset = tfds.load("coco/2017", split="validation", data_dir="data")
+    # int2str = dataset_info.features["objects"]["label"].int2str
+    # for sample in val_dataset.take(10):
+    #     image = tf.cast(sample["image"], dtype=tf.float32)
+    #     input_image, ratio = prepare_image(image)
+    #     detections = inference_model.predict(input_image)
+    #     num_detections = detections.valid_detections[0]
+    #     class_names = [
+    #         int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]
+    #     ]
+    #     label_encoder = LabelEncoder()
+    #     label_encoder.visualize_detections(
+    #         image,
+    #         detections.nmsed_boxes[0][:num_detections] / ratio,
+    #         class_names,
+    #         detections.nmsed_scores[0][:num_detections],
+    #     )
+
+    val_dataset = tfds.load("coco/2017", split="validation", data_dir="data")
+    int2str = dataset_info.features["objects"]["label"].int2str 
+
+
+    # Inference/Visualization for the image from Website
+    link = "https://images.unsplash.com/photo-1601247309106-7f9f6d85c8be?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80" #Skateboard
+    select_from_web(link)
