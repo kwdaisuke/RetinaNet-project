@@ -6,6 +6,12 @@ Keras implenmentation of RetinaNet. \
 with prediction scores \
 ![](https://github.com/kwdaisuke/RetinaNet-project/blob/main/data/Screenshot%20(102).png?raw=true)
 
+# Update
+- Add ImageLoader method
+- Add Argumentparser
+![]()
+
+
 # Todo
 - Try different benchmarks
 - Try with different layers
