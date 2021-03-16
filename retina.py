@@ -202,6 +202,7 @@ def select_from_web(link):
     input_image, ratio = prepare_image(array)
     detections = inference_model.predict(input_image)
     num_detections = detections.valid_detections[0]
+    int2str = dataset_info.features["objects"]["label"].int2str
     class_names = [int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]]
     label_encoder = LabelEncoder()
     label_encoder.visualize_detections(
@@ -219,6 +220,7 @@ def select_from_folder(dataset):
         input_image, ratio = prepare_image(array)
         detections = inference_model.predict(input_image)
         num_detections = detections.valid_detections[0]
+        int2str = dataset_info.features["objects"]["label"].int2str 
         class_names = [int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]]
         predict = dict(zip(class_names, detections.nmsed_scores[0][:num_detections])) 
         print(predict)
@@ -231,18 +233,21 @@ def select_from_folder(dataset):
 
 
 if __name__ == "__main__":
-    #model_dir = "retinanet/"
+    
+    # Hyperparameter tuning
+    model_dir = "retinanet/"
     num_classes = 80
-    batch_size = 2
-
-    # Model Construction
-    resnet50_backbone = get_backbone()
-    model = RetinaNet(num_classes, resnet50_backbone)
-    loss_fn = RetinaNetLoss(num_classes)
+    #batch_size = 2
     learning_rates = [2.5e-06, 0.000625, 0.00125, 0.0025, 0.00025, 2.5e-05]
     learning_rate_boundaries = [125, 250, 500, 240000, 360000]
     learning_rate_fn = tf.optimizers.schedules.PiecewiseConstantDecay(
         boundaries=learning_rate_boundaries, values=learning_rates)
+
+    
+    # Model Construction
+    resnet50_backbone = get_backbone()
+    model = RetinaNet(num_classes, resnet50_backbone)
+    loss_fn = RetinaNetLoss(num_classes)
     optimizer = tf.optimizers.SGD(learning_rate=learning_rate_fn, momentum=0.9)
     model.compile(loss=loss_fn, optimizer=optimizer)
     
@@ -256,11 +261,8 @@ if __name__ == "__main__":
     train_dataset, val_dataset = preprocess.process(train_dataset, val_dataset)
 
     # Train model
-    model.fit(
-        train_dataset.take(1),
-        validation_data=val_dataset.take(1),
-        epochs=1,
-        verbose=1,)
+    model.fit(train_dataset.take(1), validation_data=val_dataset.take(1),
+              epochs=1, verbose=1,)
     weights_dir = "data"
     latest_checkpoint = tf.train.latest_checkpoint(weights_dir)
     model.load_weights(latest_checkpoint)
@@ -271,31 +273,8 @@ if __name__ == "__main__":
     detections = DecodePredictions(confidence_threshold=0.5)(image, predictions)
     inference_model = tf.keras.Model(inputs=image, outputs=detections)
 
-    # # Visualization
-    # val_dataset = tfds.load("coco/2017", split="validation", data_dir="data")
-    # int2str = dataset_info.features["objects"]["label"].int2str
-    # for sample in val_dataset.take(10):
-    #     image = tf.cast(sample["image"], dtype=tf.float32)
-    #     input_image, ratio = prepare_image(image)
-    #     detections = inference_model.predict(input_image)
-    #     num_detections = detections.valid_detections[0]
-    #     class_names = [
-    #         int2str(int(x)) for x in detections.nmsed_classes[0][:num_detections]
-    #     ]
-    #     label_encoder = LabelEncoder()
-    #     label_encoder.visualize_detections(
-    #         image,
-    #         detections.nmsed_boxes[0][:num_detections] / ratio,
-    #         class_names,
-    #         detections.nmsed_scores[0][:num_detections],
-    #     )
-
-    val_dataset = tfds.load("coco/2017", split="validation", data_dir="data")
-    int2str = dataset_info.features["objects"]["label"].int2str 
-
-
     # Inference/Visualization for the image from Website
-    link = "https://images.unsplash.com/photo-1601247309106-7f9f6d85c8be?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80" #Skateboard
+    #ink = "https://images.unsplash.com/photo-1601247309106-7f9f6d85c8be?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=634&q=80" #Skateboard
     #select_from_web(link)
     
     data = Folder(args.folder) # instance of Iterable folder 
